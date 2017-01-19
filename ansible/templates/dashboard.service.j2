@@ -1,0 +1,13 @@
+[Unit]
+Description=Gunicorn instance to serve DataCave Dashboard
+After=network.target
+
+[Service]
+User={{ user }}
+Group=www-data
+WorkingDirectory={{ project_path }}
+EnvironmentFile=/etc/testbed-env
+ExecStart={{ virtualenv_path }}/bin/gunicorn --workers 3 --bind unix:{{ virtualenv_path }}/dashboard.sock -g www-data -m 007 wsgi:app
+
+[Install]
+WantedBy=multi-user.target

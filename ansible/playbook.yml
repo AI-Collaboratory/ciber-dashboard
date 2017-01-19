@@ -1,0 +1,81 @@
+---
+- hosts: ciber-dashboard
+  become: yes
+
+  vars:
+    project_path: /opt/dashboard
+    virtualenv_path: /opt/dashboard_venv
+
+  tasks:
+    - name: Install packages
+      apt: pkg={{ item }} state=latest
+      with_items:
+        - python3
+        - python-virtualenv
+        - python3-pip
+
+    - name: Creating project folder
+      file: path="{{ project_path }}" state=directory mode=0755 owner="{{ user }}" group=www-data
+      tags: code
+
+    - name: Deploy application code
+      copy: src=../../{{ item }} dest={{ project_path }} mode=0755
+      with_items:
+        - static
+        - templates
+        - dashboard.py
+        - wsgi.py
+        - requirements.txt
+      become: no
+      tags: code
+
+    - name: Deploy instance (no overwrite)
+      copy: src=../../instance dest={{ project_path }} mode=0755 force=no
+      become: no
+      tags: code
+
+    - file: path="{{ virtualenv_path }}" state=directory mode=0755 owner="{{ user }}" group=www-data
+
+    - name: Create virtualenv
+      command: virtualenv --python=/usr/bin/python3 {{ virtualenv_path }}
+      ignore_errors: yes
+      become: no
+
+    - name: Install Python package dependencies
+      command: "{{ virtualenv_path }}/bin/pip3 install -r {{ project_path }}/requirements.txt"
+      become: no
+
+    - name: Clone Drastic Client
+      git: repo=http://github.com/UMD-DRASTIC/drastic-cli.git dest=/opt/drastic-cli
+      tags: code
+
+    - name: Install Drastic dependencies
+      pip: requirements=/opt/drastic-cli/requirements.txt virtualenv={{ virtualenv_path }}
+
+    - name: Install Drastic client
+      pip: name='file:///opt/drastic-cli' state=forcereinstall virtualenv={{ virtualenv_path }}
+      tags: code
+
+    - template: src=venv_exec.j2 dest={{ virtualenv_path }}/bin/exec mode=755
+      become: no
+
+    - template: src=dashboard-env.j2 dest=/etc/dashboard-env mode=755
+
+    - name: Initialize DB
+      become: no
+      command: "{{ virtualenv_path }}/bin/exec flask init_db"
+
+    - name: Deploy Gunicorn Service
+      template: src=dashboard.service.j2 dest=/etc/systemd/system/dashboard.service mode=755
+
+    - name: Enable Gunicorn service
+      service: name=dashboard enabled=yes state=restarted
+      tags: code
+
+    - name: Detect if there is an NGINX include folder for locations
+      stat: path=/etc/nginx/location-include
+      register: loc_inc
+
+    - name: Copy location config to include folder
+      copy: src=dashboard.location.conf dest=/etc/nginx/location-include/dashboard.location.conf
+      when: item.stat.isdir

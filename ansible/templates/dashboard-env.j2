@@ -1,0 +1,16 @@
+# Celery's specific app definition
+# APP=workers.celery_app:app
+LOGLEVEL=INFO
+LOG_DIR={{ project_path }}/instance
+
+DRASTIC_URL={{ drastic_url }}
+DRASTIC_HOST={{ drastic_host }}
+DRASTIC_USER={{ worker_drastic_user }}
+DRASTIC_PASSWORD={{ worker_drastic_password }}
+
+CDMI_PROXY_URL={{ cdmi_proxy_url }}
+ELASTICSEARCH_URL={{ elasticsearch_url }}
+
+CASSANDRA_HOST={{ cassandra_host }}
+# AMQP_USER={{ rabbitmq_username }}
+# AMQP_PASSWORD={{ rabbitmq_password }}
