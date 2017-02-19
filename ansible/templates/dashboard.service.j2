@@ -6,8 +6,8 @@ After=network.target
 User={{ user }}
 Group=www-data
 WorkingDirectory={{ project_path }}
-EnvironmentFile=/etc/testbed-env
-ExecStart={{ virtualenv_path }}/bin/gunicorn --workers 3 --bind unix:{{ virtualenv_path }}/dashboard.sock -g www-data -m 007 wsgi:app
+EnvironmentFile=/etc/dashboard-env
+ExecStart={{ virtualenv_path }}/bin/gunicorn --workers 3 --log-file={{ project_path }}/instance/dashboard-gunicorn.log --log-level=info --bind unix:{{ virtualenv_path }}/dashboard.sock -g www-data -m 007 wsgi:app
 
 [Install]
 WantedBy=multi-user.target

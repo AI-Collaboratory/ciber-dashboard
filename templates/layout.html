@@ -18,14 +18,16 @@
     <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
     <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
   <![endif]-->
+  <!--<script type="text/javascript"
+    src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>-->
   <script type="text/javascript"
-    src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    src="/dashboard/static/jquery-2.2.4.js"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
-  <link rel="stylesheet" href="//code.jquery.com/ui/1.11.3/themes/smoothness/jquery-ui.css">
+  <link rel="stylesheet" href="http://code.jquery.com/ui/1.11.3/themes/smoothness/jquery-ui.css">
   <!-- Custom styles for this template -->
   <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.4.0/css/font-awesome.min.css">
-  <link href="jumbotron.css" rel="stylesheet">
-  <script src="//code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
+  <link href="/dashboard/static/jumbotron.css" rel="stylesheet">
+  <script src="http://code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
   <!--script type="text/javascript" src="./lib/translate.js"></script>
   <script type="text/javascript" src="./lib/languages.js"></script-->
 <style type="text/css">
@@ -85,7 +87,7 @@
               Batch Ingest <span class="caret"></span>
             </a>
             <ul class="dropdown-menu">
-              <li><a href="/dashboard/rgroup_ingest">Local Record Group Ingest</a></li>
+              <li><a href="/dashboard/rgroup_status">ZFS Record Group Ingest</a></li>
               <li><a href="/dashboard/nara_catalog_ingest">NARA Series Catalog API Ingest</a></li>
               <li><a href="/dashboard/json_autoindex_ingest">Nginx JSON Autoindex Ingest</a></li>
             </ul>

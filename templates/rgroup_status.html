@@ -1,0 +1,97 @@
+{% extends "layout.html" %}
+
+{% block body %}
+
+<div class="container">
+  <h1>Record Groups (and folders) in ZFS</h1>
+  <p>All of the folders at the top-level of the ZFS archive are shown here.</p>
+  <table class="table table-striped">
+    <thead>
+      <tr><th>Folder</th><th>Job Status</th><th>Files in ZFS</th><th>Is folder in Drastic?</th><th>Files in Drastic</th></tr>
+    </thead>
+    <tbody id="rg">
+    <tbody>
+  </table>
+</div>
+
+
+<script type="text/javascript">
+var drastic_rg_idx = new Map();
+
+function reloadRG() {
+  $.when( $.getJSON( "httpftp_rgroups"),
+          $.getJSON( "drastic_rgroups") )
+    .done( function( zfs_rg, drastic_rg ) {
+      dgroups = drastic_rg[0]['children'];
+      console.log('processing drastic rg JSON: '+JSON.stringify(dgroups));
+      $.each(dgroups, function(idx, obj) {
+        console.log('drastic has: '+obj);
+        var foo = { 'name': obj };
+        drastic_rg_idx.set(obj, foo);
+      });
+      console.log('drastic rgs indexed: ' + drastic_rg_idx.size );
+
+      var tbody = $('#rg');
+
+      console.log('processing ZFS rg JSON');
+      $.each(zfs_rg[0], function (index, obj) {
+        //console.log('processing ZFS rg object JSON: '+JSON.stringify(obj));
+        var tr = $('<tr/>').appendTo(tbody);
+        tr.append('<td>' + obj['name'] + '</td>');
+        if( drastic_rg_idx.has(obj['name']+'/') ) { // in Drastic?
+          tr.addClass('drastic')
+          tr.data('drastic_name', obj['name']+'/');
+          tr.attr('style', 'background-color:  #82e0aa');
+          tr.append('<td class="job"></td>'); // Job stuff
+          tr.append('<td>' + 'TBD' + '</td>'); // # ZFS
+          tr.append('<td>' + 'Yes' + '</td>');
+          tr.append('<td>' + 'TBD' + '</td>'); // # Drastic
+          $.ajax({
+            url: 'drastic_rgroup_metadata',
+            type: 'POST',
+            data: { rg: obj['name']+'/' },
+            context: tr
+          }).done( function(data) {
+            this.data('drastic_metadata', data);
+            if( data['metadata']['batch_state'] == 'ingesting' ) {
+                this.addClass('batch_ingesting');
+            }
+            console.log(data);
+          });
+        } else { // Not in Drastic yet
+          tr.append('<td class="job"><button>Ingest</button></td>'); // Job stuff
+          tr.append('<td>' + 'TBD' + '</td>'); // # ZFS
+          tr.append('<td>' + 'No' + '</td>');
+          tr.append('<td>' + 'TBD' + '</td>'); // # Drastic
+        }
+      });
+      setTimeout(updateProgress, 1000);
+    });
+}
+
+function updateProgress() {
+  $('tr.batch_ingesting').each(function() {
+    $.ajax({
+      url: 'drastic_rgroup_metadata',
+      type: 'POST',
+      data: { rg: $(this).data('drastic_name'), },
+      context: $(this)
+    }).done( function(data) {
+      this.data('drastic_metadata', data);
+      file_cnt = data['metadata']['batch_file_progress'];
+      file_total = data['metadata']['batch_file_count'];
+      this.children('td.job').html('files '+file_cnt+'/'+file_total);
+      if( data['metadata']['batch_state'] == 'done' ) {
+        this.removeClass('batch_ingesting');
+        this.addClass('batch_done');
+      }
+      console.log(data);
+    });
+  });
+  setTimeout(updateProgress, 10000);
+}
+
+$( function() { reloadRG(); } );
+</script>
+
+{% endblock %}

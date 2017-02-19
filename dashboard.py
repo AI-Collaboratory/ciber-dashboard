@@ -1,4 +1,5 @@
 import os
+import socket
 import logging
 import logging.config
 from logging import handlers
@@ -7,7 +8,7 @@ import json
 import requests
 from cli.client import DrasticClient
 from contextlib import closing
-from flask import Flask, jsonify, request, session, g, redirect, url_for, render_template, flash
+from flask import Flask, jsonify, request, session, g, redirect, url_for, render_template, Response
 
 
 app = Flask(__name__)
@@ -31,7 +32,8 @@ app.config.update(dict(
 drastic_url = os.getenv('DRASTIC_URL', 'http://localhost')
 drastic_user = os.getenv('DRASTIC_USER', 'worker')
 drastic_password = os.getenv('DRASTIC_PASSWORD', 'password')
-ciber_http_over_ftp_url = os.getenv('FTP_OVER_HTTP_URL', 'http://localhost')
+ciber_ftp_over_http_url = os.getenv('FTP_OVER_HTTP_URL', 'http://localhost')
+__client = None
 
 
 def get_client():
@@ -92,13 +94,14 @@ def welcome():
     return render_template('dashboard.html')
 
 
-@app.route('/dashboard/httpftp_rgroups/', methods=['GET'])
+@app.route('/dashboard/httpftp_rgroups', methods=['GET'])
 def get_httpftp_recordgroups():
-    res = requests.get('{0}/Federal Record Groups/'.format(ciber_http_over_ftp_url))
-    return jsonify(res.json())
+    res = requests.get('{0}/'.format(ciber_ftp_over_http_url))
+    res.raise_for_status()
+    return Response(res.text, mimetype='application/json')
 
 
-@app.route('/dashboard/drastic_rgroups/', methods=['GET'])
+@app.route('/dashboard/drastic_rgroups', methods=['GET'])
 def get_drastic_rgroups():
     return get_drastic_path('/NARA')
 
@@ -116,9 +119,41 @@ def get_drastic_path(path):
     return jsonify(res.json())
 
 
-@app.route('/dashboard/rgroup_ingest/')
+@app.route('/dashboard/rgroup_status')
 def collections():
-    return render_template('dashboard.html')
+    return render_template('rgroup_status.html')
+
+
+@app.route('/dashboard/drastic_rgroup_metadata', methods=['POST'])
+def get_drastic_rgroup_metadata():
+    drastic_rgroup_name = request.form['rg']
+    res = get_client().get_cdmi('/NARA/'+drastic_rgroup_name)
+    if not res.ok():
+        raise IOError(str(res))
+    return jsonify(res.json())
+
+
+@app.route('/dashboard/api/ingest_rgroup')
+def ingest_rgroup():
+    task_id = uuid()
+    args = (2, 2)
+    kwargs = {}
+    message = json.dumps((args, kwargs, None),
+        application_headers={
+            'lang': 'py',
+            'task': 'proj.tasks.add',
+            'argsrepr': repr(args),
+            'kwargsrepr': repr(kwargs),
+            'origin': '@'.join([os.getpid(), socket.gethostname()])
+        },
+        properties={
+            'correlation_id': task_id,
+            'content_type': 'application/json',
+            'content_encoding': 'utf-8',
+        })
+    result = {}
+    result['jobId'] = 'placeholder'
+    return jsonify(result)
 
 
 if __name__ == '__main__':

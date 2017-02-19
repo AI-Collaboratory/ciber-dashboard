@@ -4,3 +4,8 @@ location /dashboard {
   include proxy_params;
   proxy_pass http://unix:{{ virtualenv_path }}/dashboard.sock;
 }
+
+location /dashboard/static {
+  autoindex on;
+  alias {{ project_path }}/static/;
+}

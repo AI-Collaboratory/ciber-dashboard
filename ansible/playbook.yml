@@ -5,6 +5,9 @@
   vars:
     project_path: /opt/dashboard
     virtualenv_path: /opt/dashboard_venv
+    drastic_modules:
+      - { id: 'drastic-cli', version: 'develop' }
+      - { id: 'drastic-jobs', version: 'master' }
 
   tasks:
     - name: Install packages
@@ -16,7 +19,6 @@
 
     - name: Creating project folder
       file: path="{{ project_path }}" state=directory mode=0755 owner="{{ user }}" group=www-data
-      tags: code
 
     - name: Deploy application code
       copy: src=../../{{ item }} dest={{ project_path }} mode=0755
@@ -32,7 +34,6 @@
     - name: Deploy instance (no overwrite)
       copy: src=../../instance dest={{ project_path }} mode=0755 force=no
       become: no
-      tags: code
 
     - file: path="{{ virtualenv_path }}" state=directory mode=0755 owner="{{ user }}" group=www-data
 
@@ -45,37 +46,66 @@
       command: "{{ virtualenv_path }}/bin/pip3 install -r {{ project_path }}/requirements.txt"
       become: no
 
-    - name: Clone Drastic Client
-      git: repo=http://github.com/UMD-DRASTIC/drastic-cli.git dest=/opt/drastic-cli
-      tags: code
+    - name: Clone Drastic Modules
+      git: "repo=http://github.com/UMD-DRASTIC/{{ item.id }}.git dest=/opt/{{ item.id }} version={{ item.version }}"
+      tags: modules
+      with_items:
+        - { id: 'drastic-cli', version: 'develop' }
+        - { id: 'drastic-jobs', version: 'master' }
 
-    - name: Install Drastic dependencies
-      pip: requirements=/opt/drastic-cli/requirements.txt virtualenv={{ virtualenv_path }}
+    - name: Install Drastic Module Dependencies
+      pip: requirements=/opt/{{ item.id }}/requirements.txt virtualenv={{ virtualenv_path }}
+      tags: modules
+      with_items:
+        - { id: 'drastic-cli', version: 'develop' }
+        - { id: 'drastic-jobs', version: 'master' }
 
-    - name: Install Drastic client
-      pip: name='file:///opt/drastic-cli' state=forcereinstall virtualenv={{ virtualenv_path }}
-      tags: code
+    - name: Install Drastic Modules
+      pip: name='file:///opt/{{ item.id }}' state=forcereinstall virtualenv={{ virtualenv_path }}
+      tags: modules
+      with_items:
+        - { id: 'drastic-cli', version: 'develop' }
+        - { id: 'drastic-jobs', version: 'master' }
+
+    # - name: Clone Drastic Client
+    #   git: repo=http://github.com/UMD-DRASTIC/drastic-cli.git dest=/opt/drastic-cli version=develop
+    #   tags: code
+    #
+    # - name: Install Drastic dependencies
+    #   pip: requirements=/opt/drastic-cli/requirements.txt virtualenv={{ virtualenv_path }}
+    #
+    # - name: Install Drastic client
+    #   pip: name='file:///opt/drastic-cli' state=forcereinstall virtualenv={{ virtualenv_path }}
+    #   tags: code
 
     - template: src=venv_exec.j2 dest={{ virtualenv_path }}/bin/exec mode=755
       become: no
 
     - template: src=dashboard-env.j2 dest=/etc/dashboard-env mode=755
 
-    - name: Initialize DB
-      become: no
-      command: "{{ virtualenv_path }}/bin/exec flask init_db"
+#    - name: Initialize DB
+#      become: no
+#      command: "{{ virtualenv_path }}/bin/exec flask init_db"
 
     - name: Deploy Gunicorn Service
       template: src=dashboard.service.j2 dest=/etc/systemd/system/dashboard.service mode=755
 
     - name: Enable Gunicorn service
-      service: name=dashboard enabled=yes state=restarted
+      systemd: name=dashboard enabled=yes state=restarted daemon-reload=yes
       tags: code
 
     - name: Detect if there is an NGINX include folder for locations
       stat: path=/etc/nginx/location-include
-      register: loc_inc
+      register: p
 
     - name: Copy location config to include folder
-      copy: src=dashboard.location.conf dest=/etc/nginx/location-include/dashboard.location.conf
-      when: item.stat.isdir
+      template: src=dashboard.location.conf.j2 dest=/etc/nginx/location-include/dashboard.location.conf
+      when: p.stat.isdir is defined and p.stat.isdir
+
+    - name: Configure HTTP passwords
+      template: src=passwords.j2 dest=/etc/nginx/passwords
+      when: p.stat.isdir is defined and p.stat.isdir
+
+    - name: Restart NGINX service
+      systemd: name=nginx state=restarted daemon-reload=yes
+      when: p.stat.isdir is defined and p.stat.isdir
